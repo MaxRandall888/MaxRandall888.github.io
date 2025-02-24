@@ -3,96 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Max Randall | Welcome to the Cosmos</title>
+    <title>Max Randall - Space Portfolio</title>
     <style>
-        /* Basic Styling */
-        body {
+        /* Reset default margin and padding */
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
             font-family: Arial, sans-serif;
-            background-color: #000;
-            color: #fff;
-            overflow: hidden;
         }
 
-        /* Background Star Animation */
-        .stars {
-            width: 100vw;
+        /* Full-screen background */
+        body {
+            background: url('https://source.unsplash.com/1600x900/?space,stars,galaxy') no-repeat center center/cover;
+            color: white;
+            text-align: center;
+        }
+
+        /* Navigation Bar */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+        }
+
+        nav ul li {
+            margin: 0 15px;
+        }
+
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-size: 18px;
+        }
+
+        nav ul li a:hover {
+            text-decoration: underline;
+        }
+
+        /* Hero Section */
+        .hero {
             height: 100vh;
-            background: url('https://www.transparenttextures.com/patterns/dark-matter.png');
-            animation: twinkle 5s infinite;
-        }
-
-        @keyframes twinkle {
-            0%, 100% { opacity: 0.8; }
-            50% { opacity: 1; }
-        }
-
-        /* Main Content */
-        .content {
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            text-align: center;
-            z-index: 1;
+            padding: 20px;
         }
 
-        .content h1 {
-            font-size: 3rem;
+        .hero h1 {
+            font-size: 50px;
             margin-bottom: 10px;
+            text-shadow: 2px 2px 10px rgba(255, 255, 255, 0.8);
         }
 
-        .content p {
-            font-size: 1.2rem;
+        .hero p {
+            font-size: 20px;
             margin-bottom: 20px;
+            opacity: 0.8;
         }
 
-        .content a {
+        /* Call to Action Button */
+        .cta-button {
+            display: inline-block;
+            background: #ff4500;
+            color: white;
+            padding: 12px 25px;
+            font-size: 20px;
             text-decoration: none;
-            color: #0af;
-            font-size: 1rem;
+            border-radius: 5px;
+            transition: 0.3s;
         }
 
-        .content a:hover {
-            color: #0ff;
+        .cta-button:hover {
+            background: #ff2200;
         }
 
-        /* Navigation Links */
-        .nav {
+        /* Footer */
+        footer {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.6);
             position: absolute;
-            top: 20px;
-            right: 20px;
-        }
-
-        .nav a {
-            margin-left: 10px;
-            color: #fff;
-            text-decoration: none;
-            font-size: 1.1rem;
-        }
-
-        .nav a:hover {
-            text-decoration: underline;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            opacity: 0.7;
         }
     </style>
 </head>
 <body>
 
-    <div class="stars"></div>
+    <!-- Navigation -->
+    <nav>
+        <div class="logo"><h2>Max Randall</h2></div>
+        <ul>
+            <li><a href="#">Home</a></li>
+            <li><a href="#">Projects</a></li>
+            <li><a href="#">About</a></li>
+            <li><a href="#">Contact</a></li>
+        </ul>
+    </nav>
 
-    <div class="content">
-        <h1>Welcome to MaxRandall.Space</h1>
-        <p>Explore my projects, bio, and interactive tools built around the cosmos.</p>
-        <a href="#explore">Start Exploring →</a>
+    <!-- Hero Section -->
+    <div class="hero">
+        <h1>Exploring the Cosmos, One Line of Code at a Time</h1>
+        <p>Welcome to my space-themed portfolio. Discover my projects and simulations.</p>
+        <a href="#projects" class="cta-button">Explore My Work</a>
     </div>
 
-    <div class="nav">
-        <a href="projects.html">Projects</a>
-        <a href="bio.html">Bio</a>
-        <a href="sandbox.html">Cosmic Sandbox</a>
-    </div>
+    <!-- Footer -->
+    <footer>
+        <p>© 2025 Max Randall | All Rights Reserved</p>
+    </footer>
 
 </body>
 </html>
