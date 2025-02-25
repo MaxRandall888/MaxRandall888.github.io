@@ -9,12 +9,12 @@
     height: 100%;
     font-family: sans-serif;
     color: #ffffff;
-    /* Black background with subtle gridlines */
-    background-color: #000000;
-    background-image:
-      linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);
-    background-size: 20px 20px;
+    /* 
+      Single background image that stays fixed as you scroll:
+      Lagoon and Trifid.png
+    */
+    background: url("../images/Lagoon and Trifid.png") no-repeat center center fixed;
+    background-size: cover;
   }
   
   /* Remove default list styles */
@@ -71,9 +71,12 @@
     align-items: center;
     text-align: center;
     padding-bottom: 40px;
+    /* 
+      For visibility over the background, you could add a slight 
+      transparent background or color overlay if desired.
+    */
   }
   
-  /* Section 1: About */
   .intro-container {
     max-width: 600px;
     margin: 0 auto;
@@ -88,7 +91,7 @@
     object-fit: cover;
   }
   
-  /* Section 2: Projects */
+  /* Projects Section */
   .project-block {
     display: flex;
     align-items: center;
@@ -124,12 +127,12 @@
     background: #ff6600;
   }
   
-  /* Reverse row for the second block (image right) */
+  /* Reverse row for the second block (image on the right) */
   .reverse-row {
     flex-direction: row-reverse;
   }
   
-  /* Section 3: Cool List */
+  /* Cool List Section */
   .cool-list {
     text-align: left;
     margin-top: 2rem;
@@ -143,7 +146,7 @@
     border-left: 2px solid #fff;
   }
   
-  /* Example of a “cool” bullet effect */
+  /* “Cool” bullet effect */
   .cool-list li::before {
     content: "★";
     color: #ff6600;
