@@ -156,3 +156,15 @@
     top: 0.3rem;
   }
   
+  @media (max-width: 768px) {
+    .project-block {
+      flex-direction: column;
+    }
+    .project-block img {
+      order: 1;
+    }
+    .project-block .project-text {
+      order: 2;
+    }
+  }
+  
