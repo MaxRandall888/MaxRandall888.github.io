@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Star Map</title>
+  <style>
+    html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 60% 25%,#111735,#0e1322 55%,#0b0f1a 100%);overflow:hidden}
+    body{font-family:ui-monospace,Menlo,Monaco,Consolas,"Courier New",monospace;color:#e6f0ff}
+    header{position:relative;height:100vh;user-select:none}
+    #starCanvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+    .hover-label{position:absolute;z-index:3;pointer-events:none;transform:translate(-50%,-140%);background:#0b0f1acc;border:1px solid #2a3355;border-radius:10px;padding:6px 9px;font-size:12px;white-space:nowrap;color:#e8f4ff;box-shadow:0 8px 24px #0008,inset 0 0 0 1px #0005}
+  </style>
+</head>
+<body>
+  <header>
+    <canvas id="starCanvas" aria-hidden="true"></canvas>
+    <div id="hoverLabel" class="hover-label" style="display:none"></div>
+  </header>
+
+  <script>
+  (function(){
+    const canvas = document.getElementById('starCanvas');
+    const ctx = canvas.getContext('2d', { alpha:true });
+    const labelEl = document.getElementById('hoverLabel');
+
+    const GRID_SCALE = 4; // one macro pixel size
+
+    function resizeCanvas(){
+      const dpr = Math.max(1, Math.floor(window.devicePixelRatio||1));
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      canvas.width = w*dpr; canvas.height = h*dpr;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.imageSmoothingEnabled = false;
+      computePlaced(); // recompute placement whenever size changes
+    }
+
+    const PASTELS = ['#f1f4ff','#e5f2ff','#ffdceb','#efe8ff','#defff3','#f8f2ff','#d7ecff'];
+    const d2r = Math.PI/180;
+
+    // --- Constellations (RA/Dec deg, V-mag, approximate colors) ---
+    const CATALOG = [
+      {name:'Summer Triangle',stars:[
+        {ra:279.234,dec:38.783,mag:0.03,name:'Vega',color:'#bfe3ff'},
+        {ra:310.356,dec:45.281,mag:1.25,name:'Deneb',color:'#cdeaff'},
+        {ra:297.696,dec: 8.868,mag:0.77,name:'Altair',color:'#f6fdff'}],
+        links:[[0,1],[1,2],[2,0]]},
+      {name:'Cassiopeia',stars:[
+        {ra:10.126,dec:56.537,mag:2.24,name:'Schedar',color:'#ffb074'},
+        {ra: 2.295,dec:59.149,mag:2.27,name:'Caph',color:'#fff1a6'},
+        {ra:14.177,dec:60.716,mag:2.15,name:'Gamma',color:'#7fbfff'},
+        {ra:21.454,dec:60.235,mag:2.68,name:'Ruchbah',color:'#f3fbff'},
+        {ra:28.598,dec:63.670,mag:3.35,name:'Segin',color:'#8fc9ff'}],
+        links:[[1,0],[0,2],[2,3],[3,4]]},
+      {name:'Big Dipper',stars:[
+        {ra:206.885,dec:49.313,mag:1.86,name:'Alkaid',color:'#79b7ff'},
+        {ra:200.981,dec:54.925,mag:2.23,name:'Mizar',color:'#e6f9ff'},
+        {ra:193.507,dec:55.959,mag:1.76,name:'Alioth',color:'#ecfbff'},
+        {ra:183.856,dec:57.033,mag:3.32,name:'Megrez',color:'#f0fdff'},
+        {ra:178.457,dec:53.694,mag:2.41,name:'Phecda',color:'#eafaff'},
+        {ra:165.460,dec:56.382,mag:2.37,name:'Merak',color:'#ebfbff'},
+        {ra:165.932,dec:61.751,mag:1.79,name:'Dubhe',color:'#ffad66'}],
+        links:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6]]},
+      {name:'Orion',stars:[
+        {ra:88.793,dec: 7.407,mag:0.45,name:'Betelgeuse',color:'#ff6a3a'},
+        {ra:81.283,dec: 6.350,mag:1.64,name:'Bellatrix',color:'#68b3ff'},
+        {ra:78.635,dec:-8.202,mag:0.18,name:'Rigel',color:'#8ec7ff'},
+        {ra:86.939,dec:-9.670,mag:2.06,name:'Saiph',color:'#6cb1ff'},
+        {ra:85.190,dec:-1.943,mag:1.77,name:'Alnitak',color:'#66b0ff'},
+        {ra:84.053,dec:-1.202,mag:1.69,name:'Alnilam',color:'#6fb7ff'},
+        {ra:83.002,dec:-0.299,mag:2.25,name:'Mintaka',color:'#66b0ff'}],
+        links:[[0,1],[0,4],[4,3],[3,2],[2,6],[6,1],[1,0],[4,5],[5,6]]}
+    ];
+
+    const ANCHORS = {
+      'Summer Triangle':{cx:0.58,cy:0.24,w:0.38,h:0.26},
+      'Cassiopeia':{cx:0.85,cy:0.18,w:0.24,h:0.20},
+      'Big Dipper':{cx:0.18,cy:0.22,w:0.34,h:0.24},
+      'Orion':{cx:0.24,cy:0.70,w:0.30,h:0.30}
+    };
+
+    function projectGroup(group){
+      const s = group.stars;
+      const mDec = s.reduce((a,v)=>a+v.dec,0)/s.length;
+      const mRA  = s.reduce((a,v)=>a+v.ra ,0)/s.length;
+      const k = Math.cos(mDec*d2r); // RA compression for equirectangular look
+      const pts = s.map(v=>({x:(v.ra-mRA)*k,y:(v.dec-mDec),mag:v.mag,color:v.color,name:v.name||''}));
+      let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9; 
+      for(const p of pts){ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; }
+      const midX=(minX+maxX)/2, midY=(minY+maxY)/2;
+      const spanX=Math.max(maxX-minX,1e-6), spanY=Math.max(maxY-minY,1e-6);
+      return {pts,midX,midY,spanX,spanY};
+    }
+
+    // Equal pixels-per-degree + 20% larger
+    function placeIntoAnchor(group, layout){
+      const a = ANCHORS[group.name];
+      const cw = canvas.clientWidth, ch = canvas.clientHeight;
+      const sBase = 0.9 * Math.min(
+        a.w / layout.spanX,
+        (a.h / layout.spanY) * (ch / cw) // ensure px/deg equal in y
+      );
+      const s = sBase * 1.20; // +20% size bump
+      const aspect = cw / ch;
+      return layout.pts.map(p=>({
+        x: a.cx + (p.x - layout.midX) * s,
+        y: a.cy + (p.y - layout.midY) * s * aspect,
+        mag:p.mag, color:p.color, name:p.name
+      }));
+    }
+
+    let PLACED = [];
+    let HOVER_ZONES = [];
+    function computePlaced(){
+      PLACED = CATALOG.map(g=>({name:g.name, pts:placeIntoAnchor(g, projectGroup(g)), links:g.links}));
+      computeHoverZones();
+    }
+
+    function toCanvas(p){ return {x:p.x*canvas.clientWidth, y:p.y*canvas.clientHeight}; }
+    function centroidPx(g){
+      const w=canvas.clientWidth, h=canvas.clientHeight;
+      let sx=0, sy=0; for(const p of g.pts){ sx += p.x*w; sy += p.y*h; }
+      const m=g.pts.length||1; return {x:sx/m, y:sy/m};
+    }
+    function computeHoverZones(){
+      HOVER_ZONES = PLACED.map(g=>{
+        const c = centroidPx(g);
+        let r = 0;
+        for(const p of g.pts){
+          const q = toCanvas(p);
+          r = Math.max(r, Math.hypot(q.x - c.x, q.y - c.y));
+        }
+        return {x:c.x, y:c.y, r: r + 60}; // expanded click radius
+      });
+    }
+
+    const fieldStars = Object.freeze(Array.from({length:220},()=>({x:Math.random(),y:Math.random(),c:PASTELS[(Math.random()*PASTELS.length)|0],phase:Math.random()*Math.PI*2,variant:'dot',a:0.35+Math.random()*0.55})));
+
+    let hoverIdx=-1;
+    canvas.addEventListener('mousemove', e=>{
+      const r=canvas.getBoundingClientRect(); const px=e.clientX-r.left, py=e.clientY-r.top;
+      hoverIdx = -1;
+
+      // First: generous per-star hit test
+      outer: for(let i=0;i<PLACED.length;i++){
+        for(const p of PLACED[i].pts){
+          const q = toCanvas(p);
+          if(Math.hypot(px-q.x,py-q.y) < 68){ hoverIdx=i; break outer; } // larger hit radius
+        }
+      }
+      // Fallback: expanded constellation zone
+      if(hoverIdx<0){
+        for(let i=0;i<HOVER_ZONES.length;i++){
+          const z=HOVER_ZONES[i];
+          if(Math.hypot(px - z.x, py - z.y) < z.r){ hoverIdx=i; break; }
+        }
+      }
+
+      canvas.style.cursor=(hoverIdx>=0?'pointer':'default'); 
+      updateLabel();
+    });
+
+    canvas.addEventListener('mouseleave', ()=>{
+      hoverIdx=-1; canvas.style.cursor='default'; labelEl.style.display='none';
+    });
+
+    function updateLabel(){ 
+      if(hoverIdx<0){ labelEl.style.display='none'; return;}
+      const z = HOVER_ZONES[hoverIdx];
+      labelEl.textContent=PLACED[hoverIdx].name; 
+      labelEl.style.left=z.x+'px'; 
+      labelEl.style.top=z.y+'px'; 
+      labelEl.style.display='block'; 
+    }
+
+    // Click-through to breakout page
+    canvas.addEventListener('click', () => {
+      if (hoverIdx >= 0) {
+        const name = PLACED[hoverIdx].name;
+        window.location.href = 'constellation.html?name=' + encodeURIComponent(name);
+      }
+    });
+
+    // --- Star sprites ---
+    const SPRITE_CACHE=new Map();
+    function createCrossSprite(color,cells,crossLen,haloStrength,gaussSigma=0){
+      const key=color+'|'+cells+'|'+crossLen+'|'+(haloStrength*1000|0)+'|g'+(gaussSigma*1000|0);
+      if(SPRITE_CACHE.has(key)) return SPRITE_CACHE.get(key);
+      const off=document.createElement('canvas'); off.width=cells; off.height=cells; const o=off.getContext('2d',{alpha:true}); o.imageSmoothingEnabled=false;
+      const img=o.createImageData(cells,cells); const cx=(cells-1)/2, cy=(cells-1)/2; const {r:cr,g:cg,b:cb}=hexToRgb(color);
+      for(let y=0;y<cells;y++) for(let x=0;x<cells;x++){
+        const dx=x-cx, dy=y-cy, r2=dx*dx+dy*dy; const on=(dx===0||dy===0); let cross=0; if(on){const d=Math.max(Math.abs(dx),Math.abs(dy)); cross=(d===0?1:(d<=crossLen?0.85*Math.exp(-(d-1)*0.6):0));}
+        const cDist=Math.max(Math.abs(dx),Math.abs(dy)), mDist=Math.abs(dx)+Math.abs(dy);
+        const halo=(gaussSigma>0)?(haloStrength*Math.exp(-r2/(2*gaussSigma*gaussSigma))):(haloStrength*Math.exp(-cDist*0.7)*Math.exp(-mDist*0.2));
+        const a=Math.max(0,Math.min(1,cross+halo)); const idx=(y*cells+x)*4; img.data[idx]=cr; img.data[idx+1]=cg; img.data[idx+2]=cb; img.data[idx+3]=Math.round(a*255);
+      }
+      o.putImageData(img,0,0); SPRITE_CACHE.set(key,off); return off;
+    }
+    function hexToRgb(hex){ const s=hex.replace('#',''); return {r:parseInt(s.slice(0,2),16), g:parseInt(s.slice(2,4),16), b:parseInt(s.slice(4,6),16)} }
+    function rgbToHex(r,g,b){ const h=n=>Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0'); return '#'+h(r)+h(g)+h(b); }
+    function toneDownColor(hex,t){ if(t<=0) return hex; const nw={r:234,g:240,b:255}; const c=hexToRgb(hex); return rgbToHex(c.r+(nw.r-c.r)*t, c.g+(nw.g-c.g)*t, c.b+(nw.b-c.b)*t); }
+    function magParams(m){ let cells,crossLen,halo,gaussSigma,alpha,tone; if(m<=0.4){cells=15;crossLen=5;halo=0.34;gaussSigma=3;alpha=0.95;tone=0.45;} else if(m<=1.0){cells=13;crossLen=4;halo=0.30;gaussSigma=2.6;alpha=0.92;tone=0.40;} else if(m<=1.8){cells=11;crossLen=3;halo=0.25;gaussSigma=2.3;alpha=0.88;tone=0.35;} else if(m<=2.6){cells=9;crossLen=2;halo=0.20;gaussSigma=2.0;alpha=0.84;tone=0.30;} else {cells=9;crossLen=1;halo=0.14;gaussSigma=1.8;alpha=0.80;tone=0.28;} if(cells%2===0) cells++; return {cells,crossLen,halo,gaussSigma,alpha,tone}; }
+
+    function drawStarGrid(xN,yN,color,isConst,tw,_,alphaBase,mag){
+      let cells,crossLen,halo,alpha=1,use=color,gauss=0; 
+      if(isConst){ 
+        const p=magParams(mag); 
+        cells=p.cells;crossLen=p.crossLen;halo=p.halo;alpha=p.alpha;gauss=p.gaussSigma; 
+        use=toneDownColor(color,p.tone); 
+        const amp=0.08; alpha=Math.max(0,Math.min(1,alpha*(1-amp/2+amp*Math.sin(tw)))) 
+      } else { 
+        cells=1;crossLen=0;halo=0; 
+        const twi=0.85+0.15*Math.sin(tw); 
+        alpha=Math.max(0,Math.min(1,(alphaBase||0.6)*twi)); 
+      }
+      const sprite=createCrossSprite(use,cells,crossLen,halo,gauss), w=canvas.clientWidth, h=canvas.clientHeight;
+      const gx=Math.round((xN*w)/GRID_SCALE), gy=Math.round((yN*h)/GRID_SCALE); 
+      const left=(gx-Math.floor(cells/2))*GRID_SCALE, top=(gy-Math.floor(cells/2))*GRID_SCALE;
+      ctx.imageSmoothingEnabled=false; ctx.globalAlpha=alpha; 
+      ctx.drawImage(sprite,left,top,cells*GRID_SCALE,cells*GRID_SCALE); 
+      ctx.globalAlpha=1;
+    }
+
+    function drawLinks(idx){
+      const g=PLACED[idx]; ctx.save(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.2; ctx.setLineDash([]); ctx.lineCap='butt';
+      g.links.forEach(pair=>{ 
+        const a=pair[0], b=pair[1]; 
+        const A=toCanvas(g.pts[a]), B=toCanvas(g.pts[b]); 
+        const dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy); if(L<1) return; 
+        const ux=dx/L, uy=dy/L; 
+        const pa=magParams(g.pts[a].mag), pb=magParams(g.pts[b].mag); 
+        const clearance=Math.max(1,Math.round(GRID_SCALE*0.5)); 
+        const gapA=Math.round((pa.cells*GRID_SCALE)*0.5)+clearance+8;  // trim a bit more
+        const gapB=Math.round((pb.cells*GRID_SCALE)*0.5)+clearance+8; 
+        if(gapA+gapB>=L-1) return; 
+        const sx=A.x+ux*gapA, sy=A.y+uy*gapA, ex=B.x-ux*gapB, ey=B.y-uy*gapB; 
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke(); 
+      });
+      ctx.restore();
+    }
+
+    function gradientBackground(){ const w=canvas.clientWidth,h=canvas.clientHeight; const g=ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,'#0b0f1a'); g.addColorStop(1,'#0d1326'); ctx.fillStyle=g; ctx.fillRect(0,0,w,h); }
+
+    // --- Pixel-art sign (5x7 font) ---
+    const FONT5x7={
+      'A':[".###.","#...#","#...#","#####","#...#","#...#","#...#"],
+      'C':[".####","#....","#....","#....","#....","#....",".####"],
+      'E':["#####","#....","#....","####.","#....","#....","#####"],
+      'I':["#####","..#..","..#..","..#..","..#..","..#..","#####"],
+      'K':["#...#","#..#.","#.#..","##...","#.#..","#..#.","#...#"],
+      'L':["#....","#....","#....","#....","#....","#....","#####"],
+      'N':["#...#","##..#","#.#.#","#..##","#...#","#...#","#...#"],
+      'O':[".###.","#...#","#...#","#...#","#...#","#...#",".###."],
+      'S':[".####","#....","#....",".###.","....#","....#","####."],
+      'T':["#####","..#..","..#..","..#..","..#..","..#..","..#.."],
+      ' ': [".....",".....",".....",".....",".....",".....","....."]
+    };
+    function measureText5x7(t){ return t.length*6-1; } // glyph 5 + 1 spacing
+    function drawText5x7(text,l,t){ const g=GRID_SCALE, up=text.toUpperCase(); let x=l; const glyphH=7; for(let i=0;i<up.length;i++){ const ch=up[i], glyph=FONT5x7[ch]||FONT5x7[' ']; 
+        for(let oy=-1;oy<=1;oy++){ for(let ox=-1;ox<=1;ox++){ if(ox||oy){ ctx.fillStyle='#000'; for(let gy=0;gy<glyphH;gy++){ const row=glyph[gy]; for(let gx=0;gx<5;gx++){ if(row[gx]==='#') ctx.fillRect(x+(gx+ox)*g,t+(gy+oy)*g,g,g); } } } } }
+        ctx.fillStyle='#eaf0ff'; for(let gy=0;gy<glyphH;gy++){ const row=glyph[gy]; for(let gx=0;gx<5;gx++){ if(row[gx]==='#') ctx.fillRect(x+gx*g,t+gy*g,g,g); } }
+        x+=6*g; }
+    }
+    function drawSign(){ const g=GRID_SCALE, margin=6*g, text='CLICK A CONSTELLATION'; const textW=measureText5x7(text)*g; const padX=4*g, padY=4*g; const panelW=padX*2+textW, panelH=padY*2+7*g; const w=canvas.clientWidth,h=canvas.clientHeight; const x0=Math.max(g,w-panelW-margin), y0=Math.max(g,h-panelH-margin); const xm=(x0/g|0)*g, ym=(y0/g|0)*g; ctx.save(); ctx.fillStyle='#0c1226'; ctx.fillRect(xm,ym,panelW,panelH); ctx.fillStyle='#24305b'; ctx.fillRect(xm,ym,panelW,1*g); ctx.fillRect(xm,ym+panelH-1*g,panelW,1*g); ctx.fillRect(xm,ym,1*g,panelH); ctx.fillRect(xm+panelW-1*g,ym,1*g,panelH); drawText5x7(text,xm+padX,ym+padY); ctx.restore(); }
+
+    function twinklePhaseFromMag(mag){ return 0.9 - (mag||2)*0.03; }
+
+    // --- Render loop ---
+    let start=performance.now();
+    function render(now){
+      const t=(now-start)/1000, w=canvas.clientWidth, h=canvas.clientHeight;
+      ctx.clearRect(0,0,w,h); gradientBackground();
+      for(let i=0;i<fieldStars.length;i++){ const s=fieldStars[i]; drawStarGrid(s.x,s.y,s.c,false,t*1.3+s.phase,'dot',s.a); }
+      for(let gi=0;gi<PLACED.length;gi++){ const g=PLACED[gi]; for(let j=0;j<g.pts.length;j++){ const s=g.pts[j]; drawStarGrid(s.x,s.y,s.color||'#e8faff',true,t*1.05+twinklePhaseFromMag(s.mag),'plus',undefined,s.mag); } }
+      if(hoverIdx>=0) drawLinks(hoverIdx);
+      drawSign(); requestAnimationFrame(render);
+    }
+
+    const ro=new ResizeObserver(resizeCanvas); ro.observe(canvas); 
+    resizeCanvas(); requestAnimationFrame(render);
+  })();
+  </script>
+</body>
+</html>
