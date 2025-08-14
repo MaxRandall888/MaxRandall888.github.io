@@ -23,3 +23,4 @@ npm run preview
 - Tailwind is used for styling (the `.text-slate-*` classes, etc.).
 - The starfield is drawn on a `<canvas>` with crisp, pixelated stars and subtle twinkle.
 - Smooth scrolling respects `prefers-reduced-motion`.
+ 
