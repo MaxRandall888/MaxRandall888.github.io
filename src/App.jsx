@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+
 
 
 // Night-sky pixel canvas background — STARS ONLY (no nebulae/galaxies)
@@ -117,20 +118,42 @@ function Section({ id, title, children }) {
 }
 
 function Nav() {
+  const navigate = useNavigate();
+
+  const handleNav = (id) => (e) => {
+    e.preventDefault();
+
+    // Are we already on the Home route (HashRouter uses "#/")?
+    const hash = window.location.hash || '#/';
+    const onHome = hash === '#/' || hash === '';
+
+    if (onHome) {
+      // Smooth-scroll to the section
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      // Go to Home, then scroll there (LandingPage effect will do the scroll)
+      navigate('/', { state: { scrollTo: id } });
+    }
+  };
+
   return (
     <header className="sticky top-0 z-20 backdrop-blur bg-black/40 border-b border-white/10">
       <nav className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
-        <a href="#home" className="font-bold text-slate-100 tracking-tight">Max Randall</a>
+        <a href="#home" className="font-bold text-slate-100 tracking-tight" onClick={handleNav('home')}>
+          Max Randall
+        </a>
         <ul className="flex items-center gap-3 md:gap-6 text-sm">
           {[
-            ["Bio", "bio"],
-            ["Astro Photos", "astro"],
-            ["Projects", "projects"],
-            ["Résumé", "resume"],
+            ['Bio', 'bio'],
+            ['Astro Photos', 'astro'],
+            ['Projects', 'projects'],
+            ['Résumé', 'resume'],
           ].map(([label, id]) => (
             <li key={id}>
+              {/* Keep href for a11y, but prevent default + handle via JS */}
               <a
                 href={`#${id}`}
+                onClick={handleNav(id)}
                 className="text-slate-200/90 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 rounded px-1"
               >
                 {label}
@@ -142,6 +165,7 @@ function Nav() {
     </header>
   );
 }
+
 
 function Hero() {
   return (
@@ -400,6 +424,21 @@ function AllProjectsPage({ onBack }) {
 }
 
 export default function LandingPage() {
+  const location = useLocation();
+
+  useEffect(() => {
+    // If we navigated to Home with a target section, scroll to it
+    const target = location?.state?.scrollTo;
+    if (target) {
+      // wait a tick to ensure Home content is rendered
+      requestAnimationFrame(() => {
+        document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      // clear the state from the URL history so back/forward isn't sticky
+      history.replaceState({}, '', '#/');
+    }
+  }, [location?.state]);
+
   const [view, setView] = React.useState(() => new URLSearchParams(window.location.search).get('view'));
 
   // navigation helpers (no page reload)
