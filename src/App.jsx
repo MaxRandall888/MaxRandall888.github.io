@@ -10,10 +10,8 @@ function Starfield() {
   useEffect(() => {
     const canvas = ref.current;
     const ctx = canvas.getContext("2d", { alpha: true });
-    let rafId;
 
-    const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-
+    // Persisted state
     const stars = [];
     const layers = [
       { count: 90, size: 2, speed: 0.2 },
@@ -21,34 +19,103 @@ function Starfield() {
       { count: 220, size: 1, speed: 0.5 },
     ];
 
-    function initStars(W, H) {
+    // Previous metrics (for smart resize decisions)
+    const prev = {
+      w: 0,
+      h: 0,
+      dpr: 0,
+    };
+
+    // Debounce helper
+    let resizeTimer;
+    const debounce = (fn, delay = 150) => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(fn, delay);
+    };
+
+    // Init once with current DPR
+    function currentDPR() {
+      return Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    }
+
+    function initCanvasDimensions() {
+      const DPR = currentDPR();
+      const { innerWidth: wCSS, innerHeight: hCSS } = window;
+      const w = Math.floor(wCSS * DPR);
+      const h = Math.floor(hCSS * DPR);
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = wCSS + "px";
+      canvas.style.height = hCSS + "px";
+      ctx.imageSmoothingEnabled = false;
+      prev.w = w;
+      prev.h = h;
+      prev.dpr = DPR;
+    }
+
+    function initStars() {
       stars.length = 0;
+      const W = prev.w, H = prev.h;
+      const DPR = prev.dpr;
       layers.forEach((L) => {
         for (let i = 0; i < L.count; i++) {
           stars.push({
             x: Math.floor(Math.random() * W),
             y: Math.floor(Math.random() * H),
-            b: Math.random() * 0.6 + 0.4, // base brightness
-            t: Math.random() * Math.PI * 2, // twinkle phase
-            s: L.size * DPR, // pixel size
-            v: L.speed, // layer speed (phase advance only)
+            b: Math.random() * 0.6 + 0.4,     // base brightness
+            t: Math.random() * Math.PI * 2,    // twinkle phase
+            s: L.size * DPR,                   // pixel size (depends on DPR)
+            v: L.speed,                         // layer speed
           });
         }
       });
     }
 
-    function resize() {
-      const { innerWidth: w, innerHeight: h } = window;
-      canvas.width = Math.floor(w * DPR);
-      canvas.height = Math.floor(h * DPR);
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
-      ctx.imageSmoothingEnabled = false; // keep it pixel‑sharp
-      initStars(canvas.width, canvas.height);
+    function applyResizePreservingStars() {
+      const DPR = currentDPR();
+      const { innerWidth: wCSS, innerHeight: hCSS } = window;
+      const newW = Math.floor(wCSS * DPR);
+      const newH = Math.floor(hCSS * DPR);
+
+      // Ignore tiny height-only jitters (mobile chrome/address bar)
+      const widthChanged = newW !== prev.w;
+      const heightDelta = Math.abs(newH - prev.h);
+      const heightOnlyMinorChange = !widthChanged && heightDelta > 0 && heightDelta < Math.floor(64 * DPR);
+
+      const dprChanged = DPR !== prev.dpr;
+
+      if (!widthChanged && !dprChanged && heightOnlyMinorChange) {
+        // Skip meaningless resize
+        return;
+      }
+
+      // Update canvas size
+      canvas.width = newW;
+      canvas.height = newH;
+      canvas.style.width = wCSS + "px";
+      canvas.style.height = hCSS + "px";
+      ctx.imageSmoothingEnabled = false;
+
+      // Scale positions to preserve the sky layout
+      const sx = prev.w > 0 ? newW / prev.w : 1;
+      const sy = prev.h > 0 ? newH / prev.h : 1;
+      const ds = prev.dpr > 0 ? DPR / prev.dpr : 1;
+
+      for (const st of stars) {
+        st.x = Math.max(0, Math.min(newW - 1, Math.round(st.x * sx)));
+        st.y = Math.max(0, Math.min(newH - 1, Math.round(st.y * sy)));
+        if (dprChanged) st.s = Math.max(1, Math.round(st.s * ds)); // keep size proportional to DPR
+      }
+
+      // Commit new metrics
+      prev.w = newW;
+      prev.h = newH;
+      prev.dpr = DPR;
     }
 
     function draw() {
       const W = canvas.width, H = canvas.height;
+
       // subtle vertical gradient night sky
       const g = ctx.createLinearGradient(0, 0, 0, H);
       g.addColorStop(0, "#0b1020");
@@ -62,8 +129,8 @@ function Starfield() {
         const tw = (Math.sin(st.t) * 0.5 + 0.5) * 0.8 + 0.2; // 0.2..1.0
         const alpha = Math.min(1, Math.max(0.2, st.b * tw));
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = "#cfe7ff"; // cold star color
-        const s = st.s;
+        ctx.fillStyle = "#cfe7ff";
+        const s = st.s | 0;
         const x = st.x | 0, y = st.y | 0;
         ctx.fillRect(x, y, s, s);
         if (s >= 2) {
@@ -78,20 +145,46 @@ function Starfield() {
       rafId = requestAnimationFrame(draw);
     }
 
+    // Visibility handling & listeners
+    let rafId;
     function onVisibility() {
       if (document.hidden) cancelAnimationFrame(rafId);
       else rafId = requestAnimationFrame(draw);
     }
 
-    resize();
-    window.addEventListener("resize", resize);
-    document.addEventListener("visibilitychange", onVisibility);
+    const onResize = () => debounce(() => applyResizePreservingStars(), 150);
+    const onOrientation = () => applyResizePreservingStars();
+
+    // Boot
+    initCanvasDimensions();
+    initStars();
     rafId = requestAnimationFrame(draw);
+
+    // Listeners
+    window.addEventListener("resize", onResize, { passive: true });
+    window.addEventListener("orientationchange", onOrientation, { passive: true });
+    document.addEventListener("visibilitychange", onVisibility);
+
+    // Also watch visualViewport width (mobile) to ignore URL bar height jitters
+    const vv = window.visualViewport;
+    let lastVVW = vv?.width || 0;
+    const onVV = () => {
+      // only react when width changes meaningfully (rotation/real resize)
+      if (!vv) return;
+      if (Math.abs(vv.width - lastVVW) >= 1) {
+        lastVVW = vv.width;
+        onResize();
+      }
+    };
+    if (vv) vv.addEventListener("resize", onVV, { passive: true });
 
     return () => {
       cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onOrientation);
       document.removeEventListener("visibilitychange", onVisibility);
+      if (vv) vv.removeEventListener("resize", onVV);
+      clearTimeout(resizeTimer);
     };
   }, []);
 
@@ -147,7 +240,7 @@ function Nav() {
             ['Bio', 'bio'],
             ['Astro Photos', 'astro'],
             ['Projects', 'projects'],
-            ['Résumé', 'resume'],
+            ['Resume', 'resume'],
           ].map(([label, id]) => (
             <li key={id}>
               {/* Keep href for a11y, but prevent default + handle via JS */}
@@ -502,7 +595,7 @@ export default function LandingPage() {
             <ProjectsGrid goTo={goTo} />
           </Section>
 
-          <Section id="resume" title="Résumé">
+          <Section id="resume" title="Resume">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-6">
               <p className="text-sm">
                 Download a concise, one-page résumé (PDF) or view it online.
