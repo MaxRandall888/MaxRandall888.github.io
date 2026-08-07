@@ -236,7 +236,7 @@ function Nav() {
             </Link>
         <ul className="flex items-center gap-3 md:gap-6 text-sm">
           {[
-            ['Bio', 'bio'],
+            ['Skills', 'skills'],
             ['Astro Photos', 'astro'],
             ['Projects', 'projects'],
             ['Resume', 'resume'],
@@ -581,15 +581,82 @@ export default function LandingPage() {
         <main>
           <Hero />
 
-          <Section id="bio" title="Bio">
-            <p>
-              I’m <strong>Max Randall</strong>, a Computer Science & Physics student at Chapman University. I build scientific simulations, tinker with GPUs, and spend clear nights capturing deep-sky objects. I love turning complex ideas into interactive visuals that are fun to explore.
+          <Section id="skills" title="Skills & Education">
+            <p className="max-w-3xl">
+              I’m an electrical engineering and computer science graduate student focused on
+              experimental photonics, optical systems, and scientific computing. My work brings
+              together hands-on laboratory research, hardware development, and software to build,
+              measure, and validate complex systems.
             </p>
-            <ul className="mt-4 grid md:grid-cols-3 gap-3 text-sm">
-              <li className="rounded-xl bg-white/5 border border-white/10 p-3">CS + Physics • Chapman University</li>
-              <li className="rounded-xl bg-white/5 border border-white/10 p-3">Interests: photonics, fluids, cosmology</li>
-              <li className="rounded-xl bg-white/5 border border-white/10 p-3">Tools: Python, C/CUDA, JS/TS, ROOT</li>
-            </ul>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <article className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h3 className="font-semibold text-sky-200">Education</h3>
+                <div className="mt-4 space-y-4 text-sm">
+                  <div>
+                    <p className="font-medium text-slate-100">M.S. in Electrical Engineering and Computer Science</p>
+                    <p className="mt-1 text-slate-300">Chapman University <span className="text-sky-300">— In Progress</span></p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-100">B.S. in Computer Science</p>
+                    <p className="mt-1 text-slate-300">Minor in Physics, Program Honors</p>
+                    <p className="text-slate-300">Chapman University</p>
+                  </div>
+                </div>
+              </article>
+
+              <article className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h3 className="font-semibold text-sky-200">Research & Professional Interests</h3>
+                <ul className="mt-4 flex flex-wrap gap-2 text-sm">
+                  {[
+                    'Integrated photonics', 'Optical and optoelectronic computing',
+                    'Nonlinear optical materials', 'Fiber-optic sensing',
+                    'Photonic integrated circuits', 'Experimental optics',
+                    'Scientific computing', 'Optical instrumentation',
+                    'Hardware-software integration', 'Research-oriented engineering',
+                  ].map((interest) => (
+                    <li key={interest} className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+                      {interest}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+
+              <article className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h3 className="font-semibold text-sky-200">Technical Skills</h3>
+                <ul className="mt-4 flex flex-wrap gap-2 text-[13px]">
+                  {[
+                    'Experimental design and data acquisition', 'Software development',
+                    'Electronics assembly and troubleshooting', 'Polarization measurements',
+                    'Rapid prototyping and fabrication', 'Optical sensor design',
+                    'System testing and validation', 'Precision optical alignment', '3D printing',
+                    'CAD and mechanical design', 'Fiber-optic development', 'Basic machining',
+                    'Scientific data analysis', 'Laser diagnostics',
+                  ].map((skill) => (
+                    <li key={skill} className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1.5">
+                      {skill}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+
+              <article className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h3 className="font-semibold text-sky-200">Tools & Technologies</h3>
+                <ul className="mt-4 flex flex-wrap gap-2 text-sm">
+                  {[
+                    'Python', 'C++', 'Java', 'JavaScript and TypeScript', 'HTML and CSS',
+                    'Git and GitHub', 'Linux and WSL', 'Visual Studio Code', 'Onshape', 'AFM',
+                    'Fiber-optic components',
+                    'Laser and photodetector systems', 'Data-acquisition hardware',
+                    '3D printing and prototyping tools', 'Soldering and electronics-repair tools',
+                  ].map((tool) => (
+                    <li key={tool} className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+                      {tool}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </div>
           </Section>
 
           <Section id="astro" title="Astro Photos">
